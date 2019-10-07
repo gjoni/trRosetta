@@ -15,7 +15,7 @@ Contact: Ivan Anishchenko, aivan@uw.edu
 git clone https://github.com/gjoni/trRosetta
 cd trRosetta
 
-# download network
+# download pre-trained network
 wget https://files.ipd.uw.edu/pub/trRosetta/model2019_07.tar.bz2
 tar xf model2019_07.tar.bz2
 ```
