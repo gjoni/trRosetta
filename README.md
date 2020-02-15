@@ -33,4 +33,4 @@ python ./network/predict.py -m ./model2019_07 example/T1001.a3m example/T1001.np
 
 
 ## References
-J Yang, I Anishchenko, H Park, Z Peng, S Ovchinnikov, D Baker. Improved protein structure prediction using predicted inter-residue orientations. (2019) Submitted 
+[J Yang, I Anishchenko, H Park, Z Peng, S Ovchinnikov, D Baker. Improved protein structure prediction using predicted inter-residue orientations. (2020) PNAS. 117(3): 1496-1503](https://www.pnas.org/content/117/3/1496)
