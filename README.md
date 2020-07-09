@@ -1,5 +1,5 @@
 # *trRosetta*
-This package is a part of ***trRosetta*** protein structure prediction protocol developed in: [Improved protein structure prediction using predicted inter-residue orientations](https://www.biorxiv.org/content/10.1101/846279v1). It includes tools to predict protein inter-residue geometries from a multiple sequence alignment or a single sequence.
+This package is a part of ***trRosetta*** protein structure prediction protocol developed in: [Improved protein structure prediction using predicted inter-residue orientations](https://www.pnas.org/content/117/3/1496). It includes tools to predict protein inter-residue geometries from a multiple sequence alignment or a single sequence.
 
 
 Contact: Ivan Anishchenko, aivan@uw.edu
@@ -33,4 +33,4 @@ python ./network/predict.py -m ./model2019_07 example/T1001.a3m example/T1001.np
 
 
 ## References
-[J Yang, I Anishchenko, H Park, Z Peng, S Ovchinnikov, D Baker. Improved protein structure prediction using predicted inter-residue orientations. (2020) PNAS. 117(3): 1496-1503](https://www.pnas.org/content/117/3/1496)
+J Yang, I Anishchenko, H Park, Z Peng, S Ovchinnikov, D Baker. Improved protein structure prediction using predicted inter-residue orientations. (2020) [PNAS. 117(3): 1496-1503](https://www.pnas.org/content/117/3/1496)
