@@ -27,7 +27,9 @@ contacts = {'pd':[], 'po':[], 'pt':[], 'pp':[]}
 # network
 #
 config = tf.ConfigProto(
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9),
+    intra_op_parallelism_threads=1,
+    inter_op_parallelism_threads=1
 )
 activation = tf.nn.elu
 conv1d = tf.layers.conv1d
