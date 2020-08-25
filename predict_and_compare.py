@@ -64,7 +64,12 @@ for pdb in args.pdbs:
             bins = np.array([0, *np.arange(2,20,.5)])
             predicted_distance_matrix = pd.DataFrame((bins[np.argmax(distances, axis=2)]))
 
+    rmsd_true_contacts = np.sqrt(((input_distance_matrix[(input_distance_matrix != 0.0) & (input_distance_matrix < 6)] - predicted_distance_matrix[(input_distance_matrix != 0.0) & (input_distance_matrix < 6)])**2))
+    per_res_rmsd = (rmsd_true_contacts.sum() / pd.notna(rmsd_true_contacts).sum())
 
+
+
+        
     if args.plot_distance_map:
 
         fig = plt.figure(figsize=(30, 20), constrained_layout=True)
@@ -82,12 +87,12 @@ for pdb in args.pdbs:
         sns.heatmap(input_distance_matrix, ax=ax1).set_title('designed contacts', {'fontsize':22})
         sns.heatmap(predicted_distance_matrix, ax=ax2).set_title('predicted contacts', {'fontsize':22})
         
-        m = ((input_distance_matrix[(input_distance_matrix != 0.0) & (input_distance_matrix < 6)] - predicted_distance_matrix[(input_distance_matrix != 0.0) & (input_distance_matrix < 6)])**2)
-        (m.sum() / pd.notna(m).sum()).plot.bar(ax=ax3)
+        per_res_rmsd.plot.bar(ax=ax3)
         
         ax3.axes.set_xticks(np.arange(0, len(input_distance_matrix), 10))
         ax3.tick_params(which='major', length=7)
         ax3.tick_params(which='minor', length=4)
+        ax3.axhline(per_res_rmsd.mean(), color='red')
 
 
         ax3.xaxis.set_major_locator(MultipleLocator(5))
@@ -121,11 +126,18 @@ for pdb in args.pdbs:
         pymol_script_fn = '{}_contacts.pml'.format(input_basename)
         with open(pymol_script_fn, 'w') as pymol_script:
             pymol_script.write('load {}\n'.format(pdb))
+            pymol_script.write('util.cbc\n')
+
             pymol_script.write(';'.join(['distance d_{p1}_{p2}, ///{chain}/{p1}/CA, ///{chain}/{p2}/CA'.format(chain=args.chain, p1=i+1,p2=j+1) for i,j in correctly_predicted_non_local_contacts]) + '\n')
             pymol_script.write(';'.join(['distance fp_d_{p1}_{p2}, ///{chain}/{p1}/CA, ///{chain}/{p2}/CA'.format(chain=args.chain, p1=i+1,p2=j+1) for i,j in non_local_false_positive_contacts]) + '\n')
             pymol_script.write('color red, fp_*\n')
+            
+            pymol_script.write('select  missing_contacts_40, resi ' + '+'.join([str(i+1) for i in chain(*np.argwhere((per_res_rmsd > np.percentile(per_res_rmsd, 60)).to_numpy()))]) + '\n')
+            pymol_script.write('select  missing_contacts_20, resi ' + '+'.join([str(i+1) for i in chain(*np.argwhere((per_res_rmsd > np.percentile(per_res_rmsd, 80)).to_numpy()))]) + '\n')
+            pymol_script.write('color orange, missing_contacts_40\n')
+            pymol_script.write('color red, missing_contacts_20\n')
+
             pymol_script.write('zoom d_* fp_*\n')
-            pymol_script.write('util.cbc')
             
         print('pymol script with non-local contacts saved as {}'.format(pymol_script_fn))
 
