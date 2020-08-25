@@ -1,4 +1,4 @@
-#!/bin/env python
+#!env python
 import numpy as np
 import pandas as pd
 from Bio import PDB
