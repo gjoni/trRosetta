@@ -5,7 +5,7 @@ from Bio import PDB
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
                                AutoMinorLocator)
-
+from time import time
 import seaborn as sns
 from itertools import chain
 from scipy.spatial import distance_matrix
@@ -35,6 +35,7 @@ args = parser.parse_args()
 # args = parser.parse_args(['-p', '-c', 'A', '--pymol', 'ctc445/CTC-445.pdb'])
 
 for pdb in args.pdbs:
+    init_time = time()
     input_basename, _ = path.splitext(path.basename(pdb))
     # parse input pdb and prepare for prediction
     input_structure = PDB.PDBParser().get_structure('input_structure', pdb)
@@ -56,8 +57,9 @@ for pdb in args.pdbs:
         fasta.flush()
         with NamedTemporaryFile('r', suffix='.npz') as output_npz:
             print('Predicting contacts for {}'.format(pdb))
+            init_pred_time = time()
             check_call(['python', '{}/network/predict.py'.format(args.tr_rosetta_path), '-m', '{}/model2019_07'.format(args.tr_rosetta_path), fasta.name, output_npz.name], stdout=DEVNULL, stderr=DEVNULL)
-            print('Done predicting contacts for {}'.format(pdb))
+            print('Done predicting contacts for {} in {:.2f} seconds'.format(pdb, time() - init_pred_time))
 
             predictions = np.load(output_npz.name)
             distances = predictions['dist']
@@ -150,7 +152,7 @@ for pdb in args.pdbs:
         'fp_contacts': len(uniq_false_positive_contacts) / len(true_uniq_contacts),
         'tp_non_local_contacts': len(correctly_predicted_non_local_contacts) / len(true_non_local_contacts),
         'fp_non_local_contacts': len(non_local_false_positive_contacts) / len(true_non_local_contacts),
-
+        'time': time() - init_time
     }])
     
     data.to_csv(args.output, sep='\t', index=False, mode='a', header=not path.exists(args.output))
