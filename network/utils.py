@@ -1,6 +1,5 @@
+import os
 import numpy as np
-#import scipy
-#import scipy.spatial
 import string
 import tensorflow as tf
 
@@ -74,3 +73,55 @@ def fast_dca(msa1hot, weights, penalty = 4.5):
         contacts = (x3 - apc) * (1-tf.eye(nc))
 
     return tf.concat([features, contacts[:,:,None]], axis=2)
+
+
+def load_weights(DIR):
+
+    # load networks in RAM
+    w,b = [],[]
+    beta_,gamma_ = [],[]
+
+    for filename in os.listdir(DIR):
+        if not filename.endswith(".index"):
+            continue
+        mname = DIR+"/"+os.path.splitext(filename)[0]
+        print('reading weights from:', mname)
+
+        w.append([
+            tf.train.load_variable(mname, 'conv2d/kernel')
+            if i==0 else
+            tf.train.load_variable(mname, 'conv2d_%d/kernel'%i)
+            for i in range(128)])
+
+        b.append([
+            tf.train.load_variable(mname, 'conv2d/bias')
+            if i==0 else
+            tf.train.load_variable(mname, 'conv2d_%d/bias'%i)
+            for i in range(128)])
+
+        beta_.append([
+            tf.train.load_variable(mname, 'InstanceNorm/beta')
+            if i==0 else
+            tf.train.load_variable(mname, 'InstanceNorm_%d/beta'%i)
+            for i in range(123)])
+
+        gamma_.append([
+            tf.train.load_variable(mname, 'InstanceNorm/gamma')
+            if i==0 else
+            tf.train.load_variable(mname, 'InstanceNorm_%d/gamma'%i)
+            for i in range(123)])
+
+    return w,b,beta_,gamma_
+
+
+def InstanceNorm(features,beta,gamma):
+    mean,var = tf.nn.moments(features,axes=[1,2])
+    x = (features - mean[:,None,None,:]) / tf.sqrt(var[:,None,None,:]+1e-5)
+    out = tf.constant(gamma)[None,None,None,:]*x + tf.constant(beta)[None,None,None,:]
+    return out
+
+
+def Conv2d(features,w,b,d=1):
+    x = tf.nn.conv2d(features,tf.constant(w),strides=[1,1,1,1],padding="SAME",dilations=[1,d,d,1]) + tf.constant(b)[None,None,None,:]
+    return x
+
