@@ -110,7 +110,7 @@ for pdb in args.pdbs:
         
 
     # calculate relevant metrics
-    rmsd = np.sqrt(np.concatenate((input_distance_matrix - predicted_distance_matrix)**2).sum() / 160**2)
+    rmsd = np.sqrt(np.concatenate((input_distance_matrix - predicted_distance_matrix)**2).sum()/(len(input_distance_matrix)**2))
     
     true_contacts = np.argwhere((input_distance_matrix[(input_distance_matrix < 6)] > 0.0).to_numpy())
     true_uniq_contacts = set([tuple(sorted((i,j))) for i,j in true_contacts])
@@ -148,6 +148,7 @@ for pdb in args.pdbs:
     
     data = pd.DataFrame.from_dict([{
         'pdb' : pdb,
+        'pred_contact_rmsd': rmsd,
         'tp_contacts': len(correctly_predicted_unique_contacts) / len(true_uniq_contacts),
         'fp_contacts': len(uniq_false_positive_contacts) / len(true_uniq_contacts),
         'tp_non_local_contacts': len(correctly_predicted_non_local_contacts) / len(true_non_local_contacts),
