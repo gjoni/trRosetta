@@ -3,4 +3,4 @@ jupyterlab==2.2.5
 pandas==1.1.0
 seaborn==0.10.1
 tensorflow==1.14.0
-
+networkx==2.5

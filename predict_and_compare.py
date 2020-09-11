@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 from Bio import PDB
+from Bio.PDB.DSSP import DSSP
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
                                AutoMinorLocator)
@@ -15,7 +16,9 @@ from os import path, system, environ
 from subprocess import check_call, DEVNULL
 from tempfile import NamedTemporaryFile
 
-dir_path = path.dirname(path.realpath(__file__))
+from plot_utils import get_ss_elements, plot_contacts
+
+dir_path = path.dirname(path.realpath(__file__)) if '__file__' in locals() else '.'
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 
@@ -31,17 +34,21 @@ parser.add_argument('--tr-rosetta-path', default=TR_ROSETTA_DEFAULT_PATH, help='
 
 parser.add_argument('pdbs', nargs='+', help='input pdbs')
 
-args = parser.parse_args()
-# args = parser.parse_args(['-p', '-c', 'A', '--pymol', 'ctc445/CTC-445.pdb'])
+# args = parser.parse_args()
+args = parser.parse_args(['-p', '-c', 'A', '--pymol', 'ctc445/CTC-445.pdb'])
+
 
 for pdb in args.pdbs:
     init_time = time()
     input_basename, _ = path.splitext(path.basename(pdb))
     # parse input pdb and prepare for prediction
     input_structure = PDB.PDBParser().get_structure('input_structure', pdb)
+    dssp = DSSP(input_structure[0], pdb)
+    ss = [dssp[k][2] for k in filter(lambda k: k[0] == args.chain if args.chain else True, dssp.keys())]
+
     if args.chain:
         input_structure = next(filter(lambda c: c.id ==args.chain, input_structure.get_chains()))
-    
+     
     ca_atoms = list(filter(lambda a: a.name == 'CA', input_structure.get_atoms()))
     input_distance_matrix = pd.DataFrame(np.array([[np.linalg.norm(at2.coord - at1.coord) for at2 in ca_atoms] for at1 in ca_atoms]))
     input_distance_matrix[input_distance_matrix >20] = 0
@@ -70,45 +77,6 @@ for pdb in args.pdbs:
     per_res_rmsd = (rmsd_true_contacts.sum() / pd.notna(rmsd_true_contacts).sum())
 
 
-
-        
-    if args.plot_distance_map:
-
-        fig = plt.figure(figsize=(30, 20), constrained_layout=True)
-    
-        widths = [1, 1]
-        heights = [4, 2]
-
-    
-        spec = fig.add_gridspec(nrows=2, ncols=2, width_ratios=widths,height_ratios=heights)
-    
-        ax1 = fig.add_subplot(spec[0, 0]) # row 0, col 0
-        ax2 = fig.add_subplot(spec[0, 1]) # row 0, col 0
-        ax3 = fig.add_subplot(spec[1, :]) # row 1, span all columns
-
-        sns.heatmap(input_distance_matrix, ax=ax1).set_title('designed contacts', {'fontsize':22})
-        sns.heatmap(predicted_distance_matrix, ax=ax2).set_title('predicted contacts', {'fontsize':22})
-        
-        per_res_rmsd.plot.bar(ax=ax3)
-        
-        ax3.axes.set_xticks(np.arange(0, len(input_distance_matrix), 10))
-        ax3.tick_params(which='major', length=7)
-        ax3.tick_params(which='minor', length=4)
-        ax3.axhline(per_res_rmsd.mean(), color='red')
-
-
-        ax3.xaxis.set_major_locator(MultipleLocator(5))
-        ax3.xaxis.set_major_formatter(FormatStrFormatter('%d'))
-
-        # For the minor ticks, use no labels; default NullFormatter.
-        ax3.xaxis.set_minor_locator(MultipleLocator(1))
-
-        plot_fn = '{}_distance_map.png'.format(input_basename)
-        fig.savefig(plot_fn)
-        print('Distance map plots saved as {}'.format(plot_fn))
-
-        
-
     # calculate relevant metrics
     rmsd = np.sqrt(np.concatenate((input_distance_matrix - predicted_distance_matrix)**2).sum()/(len(input_distance_matrix)**2))
     
@@ -123,6 +91,67 @@ for pdb in args.pdbs:
     false_positive_contacts = np.argwhere((predicted_distance_matrix[((input_distance_matrix > 12)| (input_distance_matrix == 0)) & ((predicted_distance_matrix < 6) & (predicted_distance_matrix > 0))] > 0.0).to_numpy())
     uniq_false_positive_contacts = set([tuple(sorted((i,j))) for i,j in false_positive_contacts])
     non_local_false_positive_contacts = set(filter(lambda c: (c[1] - c[0]) >= 5, uniq_false_positive_contacts))
+
+        
+    if args.plot_distance_map:
+
+        fig = plt.figure(figsize=(30, 25), constrained_layout=True)
+    
+        widths = [1, 1]
+        heights = [4, 3, 1]
+
+    
+        spec = fig.add_gridspec(nrows=3, ncols=2, width_ratios=widths,height_ratios=heights)
+    
+        ax1 = fig.add_subplot(spec[0, 0]) # row 0, col 0
+        ax2 = fig.add_subplot(spec[0, 1]) # row 0, col 2
+        ax3 = fig.add_subplot(spec[2, :]) # row 2, span all columns
+        ax4 = fig.add_subplot(spec[1, 0]) # row 1, col 0
+        ax5 = fig.add_subplot(spec[1, 1]) # row 1, col 1
+
+
+        sns.heatmap(input_distance_matrix, ax=ax1).set_title('designed contacts', {'fontsize':22})
+        sns.heatmap(predicted_distance_matrix, ax=ax2).set_title('predicted contacts', {'fontsize':22})
+
+        for ax in [ax1, ax2]:        
+            ax.axes.set_xticks(np.arange(0, len(input_distance_matrix), 10))
+            ax.axes.set_yticks(np.arange(0, len(input_distance_matrix), 10))
+            ax.tick_params(which='major', length=7)
+            ax.tick_params(which='minor', length=4)
+            ax.xaxis.set_major_locator(MultipleLocator(5))
+            ax.yaxis.set_major_locator(MultipleLocator(5))
+            ax.xaxis.set_major_formatter(FormatStrFormatter('%d'))
+            ax.yaxis.set_major_formatter(FormatStrFormatter('%d'))
+            ax.xaxis.set_minor_locator(MultipleLocator(1))
+            ax.yaxis.set_minor_locator(MultipleLocator(1))
+        
+
+        ss_colors = {'H':'red', 'E':'yellow'}
+        per_res_rmsd.plot.bar(ax=ax3, color=[ss_colors[e] if e in ss_colors else 'gray' for e in ss], linewidth=1, edgecolor='black')
+        
+        ax3.axes.set_xticks(np.arange(0, len(input_distance_matrix), 10))
+        ax3.tick_params(which='major', length=7)
+        ax3.tick_params(which='minor', length=4)
+        ax3.axhline(per_res_rmsd.mean(), color='orange')
+
+
+        ax3.xaxis.set_major_locator(MultipleLocator(5))
+        ax3.xaxis.set_major_formatter(FormatStrFormatter('%d'))
+
+        # For the minor ticks, use no labels; default NullFormatter.
+        ax3.xaxis.set_minor_locator(MultipleLocator(1))
+
+        ss_elements = get_ss_elements(ss)
+        plot_contacts(true_non_local_contacts, correctly_predicted_non_local_contacts,non_local_false_positive_contacts, ss_elements, ax4, ax5)
+        ax4.set_title('designed contacts', {'fontsize':18})
+        ax5.set_title('predicted contacts', {'fontsize':18})
+
+
+        plot_fn = '{}_distance_map.png'.format(input_basename)
+        fig.savefig(plot_fn)
+        print('Distance map plots saved as {}'.format(plot_fn))
+
+        
     
     if args.pymol:
         pymol_script_fn = '{}_contacts.pml'.format(input_basename)
