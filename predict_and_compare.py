@@ -16,7 +16,7 @@ from os import path, system, environ
 from subprocess import check_call, DEVNULL
 from tempfile import NamedTemporaryFile
 
-from plot_utils import get_ss_elements, plot_contacts
+from plot_utils import get_ss_elements, plot_contacts, contacts_to_ss_element_graph
 
 dir_path = path.dirname(path.realpath(__file__)) if '__file__' in locals() else '.'
 
@@ -34,8 +34,10 @@ parser.add_argument('--tr-rosetta-path', default=TR_ROSETTA_DEFAULT_PATH, help='
 
 parser.add_argument('pdbs', nargs='+', help='input pdbs')
 
-# args = parser.parse_args()
-args = parser.parse_args(['-p', '-c', 'A', '--pymol', 'ctc445/CTC-445.pdb'])
+args = parser.parse_args()
+# args = parser.parse_args(['-p', '-c', 'A', '--pymol', 'ctc445/CTC-445.pdb'])
+# args = parser.parse_args(['-p', '-c', 'A', '--pymol', 'ctc445/CTC-640.pdb'])
+
 
 
 for pdb in args.pdbs:
@@ -49,8 +51,25 @@ for pdb in args.pdbs:
     if args.chain:
         input_structure = next(filter(lambda c: c.id ==args.chain, input_structure.get_chains()))
      
+#     ca_atoms = list(filter(lambda a: a.name == 'CA', input_structure.get_atoms()))
+    n_atoms = list(filter(lambda a: a.name == 'CA', input_structure.get_atoms()))
+    c_atoms = list(filter(lambda a: a.name == 'CA', input_structure.get_atoms()))
     ca_atoms = list(filter(lambda a: a.name == 'CA', input_structure.get_atoms()))
-    input_distance_matrix = pd.DataFrame(np.array([[np.linalg.norm(at2.coord - at1.coord) for at2 in ca_atoms] for at1 in ca_atoms]))
+    
+    cb_xyz = []
+    for n_at,c_at, ca_at in zip(n_atoms, c_atoms, ca_atoms):
+        n = n_at.get_vector()
+        c = c_at.get_vector()
+        ca = ca_at.get_vector()
+
+        n = n - ca
+        c = c - ca
+        rot = rotaxis(-1*np.pi * 120.0/180.0, c)
+        cb_at_origin = n.left_multiply(rot)
+        cb = cb_at_origin+ca
+        cb_xyz.append(cb)    
+    
+    input_distance_matrix = pd.DataFrame(np.array([[np.linalg.norm(at2 - at1) for at2 in cb_xyz] for at1 in cb_xyz]))
     input_distance_matrix[input_distance_matrix >20] = 0
 
 
@@ -79,6 +98,8 @@ for pdb in args.pdbs:
 
     # calculate relevant metrics
     rmsd = np.sqrt(np.concatenate((input_distance_matrix - predicted_distance_matrix)**2).sum()/(len(input_distance_matrix)**2))
+    binned_input = np.digitize(input_distance_matrix, bins)
+    logsum = np.sum(np.log([distances[i][j][binned_input[i][j]-1] for j in range(len(binned_input)) for i in range(len(binned_input))]))
     
     true_contacts = np.argwhere((input_distance_matrix[(input_distance_matrix < 6)] > 0.0).to_numpy())
     true_uniq_contacts = set([tuple(sorted((i,j))) for i,j in true_contacts])
@@ -92,7 +113,14 @@ for pdb in args.pdbs:
     uniq_false_positive_contacts = set([tuple(sorted((i,j))) for i,j in false_positive_contacts])
     non_local_false_positive_contacts = set(filter(lambda c: (c[1] - c[0]) >= 5, uniq_false_positive_contacts))
 
-        
+    ss_elements = get_ss_elements(ss)
+    designed_contact_graph = contacts_to_ss_element_graph(true_non_local_contacts, ss_elements)
+    tp_contact_graph = contacts_to_ss_element_graph(correctly_predicted_non_local_contacts, ss_elements)
+    fp_contact_graph = contacts_to_ss_element_graph(non_local_false_positive_contacts, ss_elements)
+
+    designed_ss_interactions = np.mean([1 if e in tp_contact_graph.edges else 0 for e in  designed_contact_graph.edges()])
+
+    
     if args.plot_distance_map:
 
         fig = plt.figure(figsize=(30, 25), constrained_layout=True)
@@ -141,7 +169,6 @@ for pdb in args.pdbs:
         # For the minor ticks, use no labels; default NullFormatter.
         ax3.xaxis.set_minor_locator(MultipleLocator(1))
 
-        ss_elements = get_ss_elements(ss)
         plot_contacts(true_non_local_contacts, correctly_predicted_non_local_contacts,non_local_false_positive_contacts, ss_elements, ax4, ax5)
         ax4.set_title('designed contacts', {'fontsize':18})
         ax5.set_title('predicted contacts', {'fontsize':18})
@@ -178,10 +205,17 @@ for pdb in args.pdbs:
     data = pd.DataFrame.from_dict([{
         'pdb' : pdb,
         'pred_contact_rmsd': rmsd,
+        'contact_log_sum': logsum,
         'tp_contacts': len(correctly_predicted_unique_contacts) / len(true_uniq_contacts),
         'fp_contacts': len(uniq_false_positive_contacts) / len(true_uniq_contacts),
         'tp_non_local_contacts': len(correctly_predicted_non_local_contacts) / len(true_non_local_contacts),
         'fp_non_local_contacts': len(non_local_false_positive_contacts) / len(true_non_local_contacts),
+        'tp_ss_interactions_fraction': designed_ss_interactions,
+        'tp_ss_interactions_count': len(tp_contact_graph.edges()),
+        'fp_ss_interactions_count': len(fp_contact_graph.edges()),
+
+
+
         'time': time() - init_time
     }])
     
