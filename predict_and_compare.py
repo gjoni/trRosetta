@@ -192,8 +192,8 @@ for pdb in args.pdbs:
             
             pymol_script.write('select  missing_contacts_40, resi ' + '+'.join([str(i+1) for i in chain(*np.argwhere((per_res_rmsd > np.percentile(per_res_rmsd, 60)).to_numpy()))]) + '\n')
             pymol_script.write('select  missing_contacts_20, resi ' + '+'.join([str(i+1) for i in chain(*np.argwhere((per_res_rmsd > np.percentile(per_res_rmsd, 80)).to_numpy()))]) + '\n')
-            pymol_script.write('color orange, missing_contacts_40\n')
-            pymol_script.write('color red, missing_contacts_20\n')
+            pymol_script.write('color orange, c. {} and missing_contacts_40\n'.format(chain))
+            pymol_script.write('color red,  c. {} and missing_contacts_20\n'.format(chain))
 
             pymol_script.write('zoom d_* fp_*\n')
             
