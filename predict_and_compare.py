@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from Bio import PDB
 from Bio.PDB.DSSP import DSSP
+from Bio.PDB.vectors import rotaxis
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
                                AutoMinorLocator)
