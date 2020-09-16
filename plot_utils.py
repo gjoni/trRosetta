@@ -41,10 +41,12 @@ def contacts_to_ss_element_graph(contacts, ss_elements):
 def plot_contacts(true_non_local_contacts, correctly_predicted_non_local_contacts, non_local_false_positive_contacts, ss_elements, ax1, ax2):
 
     G1 = contacts_to_ss_element_graph(true_non_local_contacts, ss_elements)
+    
+    nodes = G1.nodes if G1.nodes else []
+    edges = G1.edges if G1.edges else []
+    node_colors = ['red' if n[0] == 'H' else 'yellow' for n in nodes]
 
-    node_colors = ['red' if n[0] == 'H' else 'yellow' for n in G1.nodes]
-
-    edge_labels = dict([((i,j), G1.edges[i,j]['weight']) for i,j in G1.edges])
+    edge_labels = dict([((i,j), G1.edges[i,j]['weight']) for i,j in edges])
     weights = [2*G1[u][v]['weight'] for u, v in G1.edges()]
 
     pos = nx.planar_layout(G1)
