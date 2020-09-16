@@ -46,7 +46,10 @@ for pdb in args.pdbs:
     input_basename, _ = path.splitext(path.basename(pdb))
     # parse input pdb and prepare for prediction
     input_structure = PDB.PDBParser().get_structure('input_structure', pdb)
-    dssp = DSSP(input_structure[0], pdb)
+    try:
+        dssp = DSSP(input_structure[0], pdb)
+    except Exception as e:
+        raise RuntimeError('DSSP failed', e)
     ss = [dssp[k][2] for k in filter(lambda k: k[0] == args.chain if args.chain else True, dssp.keys())]
 
     if args.chain:
@@ -123,15 +126,14 @@ for pdb in args.pdbs:
 
     
     if args.plot_distance_map:
-
         fig = plt.figure(figsize=(30, 25), constrained_layout=True)
-    
+
         widths = [1, 1]
         heights = [4, 3, 1]
 
-    
+
         spec = fig.add_gridspec(nrows=3, ncols=2, width_ratios=widths,height_ratios=heights)
-    
+
         ax1 = fig.add_subplot(spec[0, 0]) # row 0, col 0
         ax2 = fig.add_subplot(spec[0, 1]) # row 0, col 2
         ax3 = fig.add_subplot(spec[2, :]) # row 2, span all columns
@@ -153,11 +155,11 @@ for pdb in args.pdbs:
             ax.yaxis.set_major_formatter(FormatStrFormatter('%d'))
             ax.xaxis.set_minor_locator(MultipleLocator(1))
             ax.yaxis.set_minor_locator(MultipleLocator(1))
-        
+
 
         ss_colors = {'H':'red', 'E':'yellow'}
         per_res_rmsd.plot.bar(ax=ax3, color=[ss_colors[e] if e in ss_colors else 'gray' for e in ss], linewidth=1, edgecolor='black')
-        
+
         ax3.axes.set_xticks(np.arange(0, len(input_distance_matrix), 10))
         ax3.tick_params(which='major', length=7)
         ax3.tick_params(which='minor', length=4)
@@ -169,37 +171,40 @@ for pdb in args.pdbs:
 
         # For the minor ticks, use no labels; default NullFormatter.
         ax3.xaxis.set_minor_locator(MultipleLocator(1))
-
-        plot_contacts(true_non_local_contacts, correctly_predicted_non_local_contacts,non_local_false_positive_contacts, ss_elements, ax4, ax5)
-        ax4.set_title('designed contacts', {'fontsize':18})
-        ax5.set_title('predicted contacts', {'fontsize':18})
-
+        try:
+            plot_contacts(true_non_local_contacts, correctly_predicted_non_local_contacts,non_local_false_positive_contacts, ss_elements, ax4, ax5)
+            ax4.set_title('designed contacts', {'fontsize':18})
+            ax5.set_title('predicted contacts', {'fontsize':18})
+        except:
+            print('Failed to to produce graph')
+        
+    
 
         plot_fn = '{}_distance_map.png'.format(input_basename)
         fig.savefig(plot_fn)
         print('Distance map plots saved as {}'.format(plot_fn))
 
-        
-    
     if args.pymol:
-        pymol_script_fn = '{}_contacts.pml'.format(input_basename)
-        with open(pymol_script_fn, 'w') as pymol_script:
-            pymol_script.write('load {}\n'.format(pdb))
-            pymol_script.write('util.cbc\n')
+        try:
+            pymol_script_fn = '{}_contacts.pml'.format(input_basename)
+            with open(pymol_script_fn, 'w') as pymol_script:
+                pymol_script.write('load {}\n'.format(pdb))
+                pymol_script.write('util.cbc\n')
 
-            pymol_script.write(';'.join(['distance d_{p1}_{p2}, ///{chain}/{p1}/CA, ///{chain}/{p2}/CA'.format(chain=args.chain, p1=i+1,p2=j+1) for i,j in correctly_predicted_non_local_contacts]) + '\n')
-            pymol_script.write(';'.join(['distance fp_d_{p1}_{p2}, ///{chain}/{p1}/CA, ///{chain}/{p2}/CA'.format(chain=args.chain, p1=i+1,p2=j+1) for i,j in non_local_false_positive_contacts]) + '\n')
-            pymol_script.write('color red, fp_*\n')
-            
-            pymol_script.write('select  missing_contacts_40, resi ' + '+'.join([str(i+1) for i in chain(*np.argwhere((per_res_rmsd > np.percentile(per_res_rmsd, 60)).to_numpy()))]) + '\n')
-            pymol_script.write('select  missing_contacts_20, resi ' + '+'.join([str(i+1) for i in chain(*np.argwhere((per_res_rmsd > np.percentile(per_res_rmsd, 80)).to_numpy()))]) + '\n')
-            pymol_script.write('color orange, c. {} and missing_contacts_40\n'.format(chain))
-            pymol_script.write('color red,  c. {} and missing_contacts_20\n'.format(chain))
+                pymol_script.write(';'.join(['distance d_{p1}_{p2}, ///{chain}/{p1}/CA, ///{chain}/{p2}/CA'.format(chain=args.chain, p1=i+1,p2=j+1) for i,j in correctly_predicted_non_local_contacts]) + '\n')
+                pymol_script.write(';'.join(['distance fp_d_{p1}_{p2}, ///{chain}/{p1}/CA, ///{chain}/{p2}/CA'.format(chain=args.chain, p1=i+1,p2=j+1) for i,j in non_local_false_positive_contacts]) + '\n')
+                pymol_script.write('color red, fp_*\n')
 
-            pymol_script.write('zoom d_* fp_*\n')
-            
-        print('pymol script with non-local contacts saved as {}'.format(pymol_script_fn))
+                pymol_script.write('select  missing_contacts_40, resi ' + '+'.join([str(i+1) for i in chain(*np.argwhere((per_res_rmsd > np.percentile(per_res_rmsd, 60)).to_numpy()))]) + '\n')
+                pymol_script.write('select  missing_contacts_20, resi ' + '+'.join([str(i+1) for i in chain(*np.argwhere((per_res_rmsd > np.percentile(per_res_rmsd, 80)).to_numpy()))]) + '\n')
+                pymol_script.write('color orange, c. {} and missing_contacts_40\n'.format(args.chain))
+                pymol_script.write('color red,  c. {} and missing_contacts_20\n'.format(args.chain))
 
+                pymol_script.write('zoom d_* fp_*\n')
+
+            print('pymol script with non-local contacts saved as {}'.format(pymol_script_fn))
+        except:
+            print('Failed to produced pymol script')
 
 
     
