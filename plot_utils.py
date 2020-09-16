@@ -42,8 +42,8 @@ def plot_contacts(true_non_local_contacts, correctly_predicted_non_local_contact
 
     G1 = contacts_to_ss_element_graph(true_non_local_contacts, ss_elements)
     
-    nodes = G1.nodes if G1.nodes else []
-    edges = G1.edges if G1.edges else []
+    nodes = G1.nodes if len(G1.nodes) == 0 else []
+    edges = G1.edges if len(G1.edges) == 0 else []
     node_colors = ['red' if n[0] == 'H' else 'yellow' for n in nodes]
 
     edge_labels = dict([((i,j), G1.edges[i,j]['weight']) for i,j in edges])
