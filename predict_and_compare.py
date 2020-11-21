@@ -56,8 +56,8 @@ for pdb in args.pdbs:
         input_structure = next(filter(lambda c: c.id ==args.chain, input_structure.get_chains()))
      
 #     ca_atoms = list(filter(lambda a: a.name == 'CA', input_structure.get_atoms()))
-    n_atoms = list(filter(lambda a: a.name == 'CA', input_structure.get_atoms()))
-    c_atoms = list(filter(lambda a: a.name == 'CA', input_structure.get_atoms()))
+    n_atoms = list(filter(lambda a: a.name == 'N', input_structure.get_atoms()))
+    c_atoms = list(filter(lambda a: a.name == 'C', input_structure.get_atoms()))
     ca_atoms = list(filter(lambda a: a.name == 'CA', input_structure.get_atoms()))
     
     cb_xyz = []
@@ -98,10 +98,15 @@ for pdb in args.pdbs:
 
     rmsd_true_contacts = np.sqrt(((input_distance_matrix[(input_distance_matrix != 0.0) & (input_distance_matrix < 6)] - predicted_distance_matrix[(input_distance_matrix != 0.0) & (input_distance_matrix < 6)])**2))
     per_res_rmsd = (rmsd_true_contacts.sum() / pd.notna(rmsd_true_contacts).sum())
-
+    dxd = ((input_distance_matrix - predicted_distance_matrix)**2).values
+    per_res_rmsd9 = np.sqrt([np.sum(dxd[i-4:i+4+1,i-4:i+4+1]) for i in range(4, len(dxd)-4)])/np.sqrt(9*9)
+    per_res_rmsd9 = pd.Series(np.concatenate([0.5*np.ones((4), dtype=np.float), per_res_rmsd9, 0.5*np.ones((4), dtype=np.float)]))
 
     # calculate relevant metrics
     rmsd = np.sqrt(np.concatenate((input_distance_matrix - predicted_distance_matrix)**2).sum()/(len(input_distance_matrix)**2))
+    rmsd9_mean = np.mean(per_res_rmsd9[4:-4])
+    rmsd9_worst20pc = np.mean(np.sort(per_res_rmsd9)[int(len(per_res_rmsd9)*0.8):-1])
+
     binned_input = np.digitize(input_distance_matrix, bins)
     logsum = np.sum(np.log([distances[i][j][binned_input[i][j]-1] for j in range(len(binned_input)) for i in range(len(binned_input))]))
     
@@ -129,17 +134,16 @@ for pdb in args.pdbs:
         fig = plt.figure(figsize=(30, 25), constrained_layout=True)
 
         widths = [1, 1]
-        heights = [4, 3, 1]
+        heights = [4, 3, 1, 1]
 
-
-        spec = fig.add_gridspec(nrows=3, ncols=2, width_ratios=widths,height_ratios=heights)
+        spec = fig.add_gridspec(nrows=4, ncols=2, width_ratios=widths,height_ratios=heights)
 
         ax1 = fig.add_subplot(spec[0, 0]) # row 0, col 0
         ax2 = fig.add_subplot(spec[0, 1]) # row 0, col 2
         ax3 = fig.add_subplot(spec[2, :]) # row 2, span all columns
         ax4 = fig.add_subplot(spec[1, 0]) # row 1, col 0
         ax5 = fig.add_subplot(spec[1, 1]) # row 1, col 1
-
+        ax6 = fig.add_subplot(spec[3, :]) # row 3, span all columns
 
         sns.heatmap(input_distance_matrix, ax=ax1).set_title('designed contacts', {'fontsize':22})
         sns.heatmap(predicted_distance_matrix, ax=ax2).set_title('predicted contacts', {'fontsize':22})
@@ -156,29 +160,34 @@ for pdb in args.pdbs:
             ax.xaxis.set_minor_locator(MultipleLocator(1))
             ax.yaxis.set_minor_locator(MultipleLocator(1))
 
-
         ss_colors = {'H':'red', 'E':'yellow'}
-        per_res_rmsd.plot.bar(ax=ax3, color=[ss_colors[e] if e in ss_colors else 'gray' for e in ss], linewidth=1, edgecolor='black')
 
+        per_res_rmsd.plot.bar(ax=ax3, color=[ss_colors[e] if e in ss_colors else 'gray' for e in ss], linewidth=1, edgecolor='black')
         ax3.axes.set_xticks(np.arange(0, len(input_distance_matrix), 10))
         ax3.tick_params(which='major', length=7)
         ax3.tick_params(which='minor', length=4)
         ax3.axhline(per_res_rmsd.mean(), color='orange')
-
-
         ax3.xaxis.set_major_locator(MultipleLocator(5))
         ax3.xaxis.set_major_formatter(FormatStrFormatter('%d'))
 
+        per_res_rmsd9.plot.bar(ax=ax6, color=[ss_colors[e] if e in ss_colors else 'gray' for e in ss], linewidth=1, edgecolor='black')
+        ax6.axes.set_xticks(np.arange(0, len(input_distance_matrix), 10))
+        ax6.tick_params(which='major', length=7)
+        ax6.tick_params(which='minor', length=4)
+        ax6.axhline(per_res_rmsd9.mean(), color='orange')
+        ax6.xaxis.set_major_locator(MultipleLocator(5))
+        ax6.xaxis.set_major_formatter(FormatStrFormatter('%d'))
+
         # For the minor ticks, use no labels; default NullFormatter.
         ax3.xaxis.set_minor_locator(MultipleLocator(1))
+        ax6.xaxis.set_minor_locator(MultipleLocator(1))
+
         try:
             plot_contacts(true_non_local_contacts, correctly_predicted_non_local_contacts,non_local_false_positive_contacts, ss_elements, ax4, ax5)
             ax4.set_title('designed contacts', {'fontsize':18})
             ax5.set_title('predicted contacts', {'fontsize':18})
         except:
             print('Failed to to produce graph')
-        
-    
 
         plot_fn = '{}_distance_map.png'.format(input_basename)
         fig.savefig(plot_fn)
@@ -219,6 +228,8 @@ for pdb in args.pdbs:
         'tp_ss_interactions_fraction': designed_ss_interactions,
         'tp_ss_interactions_count': len(tp_contact_graph.edges()),
         'fp_ss_interactions_count': len(fp_contact_graph.edges()),
+        'rmsd_9frag_mean': rmsd9_mean,
+        'rmsd_9frag_worst20pc_mean': rmsd9_worst20pc,
 
 
 
