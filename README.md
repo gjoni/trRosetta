@@ -4,6 +4,10 @@ This package is a part of ***trRosetta*** protein structure prediction protocol 
 
 Contact: Ivan Anishchenko, aivan@uw.edu
 
+## Updates
+
+[***trRosetta2***](https://github.com/RosettaCommons/trRosetta2) is now available (May 20, 2021)
+
 
 ## Requirements
 ```tensorflow``` (tested on versions ```1.13``` and ```1.14```)
