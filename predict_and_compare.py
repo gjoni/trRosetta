@@ -27,7 +27,9 @@ TR_ROSETTA_DEFAULT_PATH = environ['TR_ROSETTA_PATH'] if 'TR_ROSETTA_PATH' in env
 
 parser.add_argument('-c', '--chain', help='Chain to use for contact prediction and comparison')
 parser.add_argument('-p', '--plot-distance-map', action='store_true', help='save plot of distance map as png')
+parser.add_argument('-d', '--output-distgram', action='store_true', help='save distgram prediction as npy')
 parser.add_argument('-o', '--output', default='contacts.csv', help='Name of the output csv file')
+parser.add_argument('--distgram-filename', default='distgram.npy', help='Name of the output distgram file (.npy)')
 parser.add_argument('--pymol', action='store_true', help='save pymol script that plots the contacts')
 
 parser.add_argument('--tr-rosetta-path', default=TR_ROSETTA_DEFAULT_PATH, help='Path to where tr rosetta is installed, can also be set using the TR_ROSETTA_PATH environment variable')
@@ -93,6 +95,8 @@ for pdb in args.pdbs:
 
             predictions = np.load(output_npz.name)
             distances = predictions['dist']
+            if args.output_distgram:
+                np.save(args.distgram_filename, distances)
             bins = np.array([0, *np.arange(2,20,.5)])
             predicted_distance_matrix = pd.DataFrame((bins[np.argmax(distances, axis=2)]))
 
@@ -239,4 +243,6 @@ for pdb in args.pdbs:
     data.to_csv(args.output, sep='\t', index=False, mode='a', header=not path.exists(args.output))
 
 print('contact metrics saved as {}'.format(args.output))
+if args.output_distgram:
+    print('distgram saved as {}'.format(args.distgram_filename))
 
