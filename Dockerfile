@@ -1,7 +1,6 @@
 FROM python:3.7
 
-RUN apt-get update && apt-get install -y \
-    dssp \
+RUN apt-get update -y && apt-get install -y dssp\
  && rm -rf /var/lib/apt/lists/*
 
 ADD . /code
